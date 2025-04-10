@@ -2,8 +2,9 @@ import { Request, Response, NextFunction } from "express";
 import { knex } from "@/database/knex";
 import { AppError } from "@/utils/app-error";
 import { z } from "zod";
+import { title } from "process";
 
-class AuthorsController {
+class BooksController {
   async create(
     request: Request,
     response: Response,
@@ -11,12 +12,13 @@ class AuthorsController {
   ): Promise<any> {
     try {
       const bodySchema = z.object({
-        name: z.string({ required_error: "name is required!" }).trim().min(6),
+        title: z.string({ required_error: "title is required" }),
+        author_id: z.number({ required_error: "author_id is required" }),
       });
 
-      const { name } = bodySchema.parse(request.body);
+      const { title, author_id } = bodySchema.parse(request.body);
 
-      await knex<AuthorRepository>("authors").insert({ name });
+      await knex<BooksRepository>("books").insert({ title, author_id });
 
       return response.status(201).json();
     } catch (error) {
@@ -30,14 +32,21 @@ class AuthorsController {
     next: NextFunction
   ): Promise<any> {
     try {
-      const { name } = request.query;
+      const { title, author } = request.query;
 
-      const authors = await knex<AuthorRepository>("authors")
-        .select()
-        .whereLike("name", `%${name ?? ""}%`)
-        .orderBy("name");
+      const books = await knex<BooksRepository>("books")
+        .select(
+          "books.id",
+          knex.raw("authors.name AS author"),
+          "books.title",
+          "books.created_at",
+          "books.updated_at"
+        )
+        .whereLike("title", `%${title ?? ""}%`)
+        .andWhereLike("authors.name", `%${author ?? ""}%`)
+        .join("authors", "authors.id", "books.author_id");
 
-      return response.json(authors);
+      return response.json(books);
     } catch (error) {
       next(error);
     }
@@ -58,25 +67,30 @@ class AuthorsController {
         .parse(request.params.id);
 
       const bodySchema = z.object({
-        name: z.string({ required_error: "name is required!" }).trim().min(6),
+        author_id: z.number({ required_error: "author_id is required" }),
+        title: z.string({ required_error: "title is required" }),
       });
 
-      const { name } = bodySchema.parse(request.body);
+      const { title, author_id } = bodySchema.parse(request.body);
 
-      const author = await knex<AuthorRepository>("authors")
+      const book = await knex<BooksRepository>("books")
         .select()
         .where({ id })
         .first();
 
-      if (!author) {
-        throw new AppError("author not found");
+      if (!book) {
+        throw new AppError("book not found");
       }
 
-      await knex<AuthorRepository>("authors")
-        .update({ name, updated_at: knex.fn.now() })
+      await knex<BooksRepository>("books")
+        .update({
+          title,
+          author_id,
+          updated_at: knex.fn.now(),
+        })
         .where({ id });
 
-      return response.status(200).json();
+      return response.status(200).json(book);
     } catch (error) {
       next(error);
     }
@@ -96,16 +110,16 @@ class AuthorsController {
         })
         .parse(request.params.id);
 
-      const author = await knex<AuthorRepository>("authors")
+      const book = await knex<BooksRepository>("books")
         .select()
         .where({ id })
         .first();
 
-      if (!author) {
-        throw new AppError("author not found");
+      if (!book) {
+        throw new AppError("book not found");
       }
 
-      await knex<AuthorRepository>("authors").delete().where({ id });
+      await knex<BooksRepository>("books").delete().where({ id });
 
       return response.json();
     } catch (error) {
@@ -114,4 +128,4 @@ class AuthorsController {
   }
 }
 
-export { AuthorsController };
+export { BooksController };
