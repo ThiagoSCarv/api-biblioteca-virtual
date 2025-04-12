@@ -17,19 +17,28 @@ class BookLoansControllers {
 
       const { book_id, user } = bodySchema.parse(request.body);
 
-      const book = await knex<BookLoansRepository>("book-loans")
+      const bookExists = await knex<BooksRepository>("books")
+        .select()
+        .where("id", book_id)
+        .first();
+
+      const bookNotAvaliable = await knex<BookLoansRepository>("book-loans")
         .select()
         .where({ book_id })
         .whereNull("closed_at")
         .first();
 
-      if(book) {
-        throw new AppError("book is on loan")
+      if (!bookExists) {
+        throw new AppError("book not found");
       }
-      
+
+      if (bookNotAvaliable) {
+        throw new AppError("book is on loan");
+      }
+
       await knex<BookLoansRepository>("book-loans").insert({ book_id, user });
 
-      return response.status(201).json(book);
+      return response.status(201).json(bookExists);
     } catch (error) {
       next(error);
     }

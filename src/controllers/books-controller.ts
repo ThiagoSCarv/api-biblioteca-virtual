@@ -18,6 +18,15 @@ class BooksController {
 
       const { title, author_id } = bodySchema.parse(request.body);
 
+      const author = await knex<AuthorRepository>("authors")
+        .select()
+        .where("id", author_id)
+        .first();
+
+      if (!author) {
+        throw new AppError("author not found");
+      }
+
       await knex<BooksRepository>("books").insert({ title, author_id });
 
       return response.status(201).json();
